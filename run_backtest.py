@@ -22,6 +22,9 @@ def _run_sweep(store, market, tf, args, allowed_states=None, save_mode='wf'):
         r = run_walkforward_backtest(
             store, market, tf,
             k=args.k, sl_pct=sl, rr_ratio=rr,
+            threshold_long=args.threshold,
+            threshold_short=round(1.0 - args.threshold, 4),
+            min_stars=args.min_stars,
             start_capital=args.capital, risk_per_trade_pct=args.risk,
             allowed_states=allowed_states,
         )
@@ -75,6 +78,10 @@ def main():
     parser.add_argument('--k',          type=int,   default=20)
     parser.add_argument('--sl-pct',     type=float, default=1.5,  dest='sl_pct')
     parser.add_argument('--rr',         type=float, default=2.0)
+    parser.add_argument('--threshold',  type=float, default=0.62,
+                        help='Mindest-Konfidenz für Long (Short=1-threshold, default: 0.62)')
+    parser.add_argument('--min-stars',  type=int,   default=2,    dest='min_stars',
+                        help='Mindest-Qualitätssterne (default: 2)')
     parser.add_argument('--sweep',      action='store_true', default=False,
                         help='SL/RR-Sweep: alle Kombinationen testen, beste anzeigen')
     parser.add_argument('--min-trades', type=int,   default=10,   dest='min_trades',
@@ -114,6 +121,9 @@ def main():
             results = run_walkforward_backtest(
                 store, market, tf,
                 k=args.k, sl_pct=args.sl_pct, rr_ratio=args.rr,
+                threshold_long=args.threshold,
+                threshold_short=round(1.0 - args.threshold, 4),
+                min_stars=args.min_stars,
                 start_capital=args.capital, risk_per_trade_pct=args.risk,
                 allowed_states=allowed_states,
             )

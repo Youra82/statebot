@@ -162,6 +162,18 @@ if [[ "$RUN_BT" == "j" || "$RUN_BT" == "J" || "$RUN_BT" == "y" || "$RUN_BT" == "
     if [[ "$RISK_INPUT" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then RISK=$RISK_INPUT; fi
 
     echo ""
+    read -p "Konfidenz-Schwelle Long/Short [Standard: 0.62 | z.B. 0.75 für hohe Selektion]: " THRESH_INPUT
+    THRESH_INPUT="${THRESH_INPUT//[$'\r\n ']/}"
+    THRESHOLD="0.62"
+    if [[ "$THRESH_INPUT" =~ ^0\.[0-9]+$ ]]; then THRESHOLD=$THRESH_INPUT; fi
+
+    read -p "Mindest-Qualitätssterne 1-3 [Standard: 2]: " STARS_INPUT
+    STARS_INPUT="${STARS_INPUT//[$'\r\n ']/}"
+    MIN_STARS="2"
+    if [[ "$STARS_INPUT" =~ ^[123]$ ]]; then MIN_STARS=$STARS_INPUT; fi
+    echo -e "${CYAN}ℹ  Threshold=$THRESHOLD | Min-Stars=$MIN_STARS${NC}"
+
+    echo ""
     read -p "SL/RR automatisch optimieren (Sweep)? (j/n) [Standard: n]: " DO_SWEEP
     DO_SWEEP="${DO_SWEEP//[$'\r\n ']/}"
     DO_SWEEP="${DO_SWEEP:-n}"
@@ -255,9 +267,9 @@ if [[ "$RUN_BT" == "j" || "$RUN_BT" == "J" || "$RUN_BT" == "y" || "$RUN_BT" == "
     echo -e "${YELLOW}[Schritt 2/4] Backtest läuft...${NC}"
     echo ""
     if [[ "$DO_SWEEP" == "j" || "$DO_SWEEP" == "J" ]]; then
-        BT_ARGS="--sweep --min-trades 10 --top-n 1"
+        BT_ARGS="--sweep --min-trades 10 --top-n 1 --threshold $THRESHOLD --min-stars $MIN_STARS"
     else
-        BT_ARGS="--sl-pct $SL --rr $RR"
+        BT_ARGS="--sl-pct $SL --rr $RR --threshold $THRESHOLD --min-stars $MIN_STARS"
     fi
 
     echo "$PAIRS" | while IFS=' ' read -r sym tf; do
