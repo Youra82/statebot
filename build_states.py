@@ -25,7 +25,9 @@ from statebot.engine.store      import StateStore
 from statebot.engine.clusterer  import build_state_labels
 from statebot.engine.transitions import build_transition_matrix, build_transition_matrix_order2
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
+_log_fmt = ('  %(message)s' if os.environ.get('STATEBOT_PIPELINE')
+            else '%(asctime)s %(levelname)s: %(message)s')
+logging.basicConfig(level=logging.INFO, format=_log_fmt)
 logger = logging.getLogger(__name__)
 
 DB_PATH = os.path.join(PROJECT_ROOT, 'artifacts', 'db', 'states.db')
