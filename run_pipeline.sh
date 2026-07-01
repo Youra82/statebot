@@ -233,7 +233,7 @@ done
 echo ""
 
 # ── Schritt 1: State Space aufbauen ──────────────────────────────────────────
-echo -e "${YELLOW}[Schritt 1/3] State Space aufbauen (Features → Clustering → Transitions)...${NC}"
+echo -e "${YELLOW}[Schritt 1/4] State Space aufbauen (Features → Clustering → Transitions)...${NC}"
 echo ""
 
 export STATEBOT_PIPELINE=1
@@ -252,7 +252,7 @@ echo ""
 
 # ── Schritt 2: Backtest ───────────────────────────────────────────────────────
 if [[ "$RUN_BT" == "j" || "$RUN_BT" == "J" || "$RUN_BT" == "y" || "$RUN_BT" == "Y" ]]; then
-    echo -e "${YELLOW}[Schritt 2/3] Backtest läuft...${NC}"
+    echo -e "${YELLOW}[Schritt 2/4] Backtest läuft...${NC}"
     echo ""
     if [[ "$DO_SWEEP" == "j" || "$DO_SWEEP" == "J" ]]; then
         BT_ARGS="--sweep --min-trades 10 --top-n 1"
@@ -271,10 +271,46 @@ if [[ "$RUN_BT" == "j" || "$RUN_BT" == "J" || "$RUN_BT" == "y" || "$RUN_BT" == "
     done
     echo -e "${GREEN}✔ Backtest abgeschlossen.${NC}"
     echo ""
+
+    # ── Schritt 3: Attribution ────────────────────────────────────────────────
+    echo -e "${YELLOW}[Schritt 3/4] State-Analyse (Attribution)...${NC}"
+    echo ""
+
+    RESULT_FILES=$(ls "$SCRIPT_DIR/artifacts/results"/backtest_wf_*.json 2>/dev/null || true)
+
+    if [ -z "$RESULT_FILES" ]; then
+        echo "  Keine Backtest-Ergebnisse gefunden."
+    else
+        # Per-Coin: State-Breakdown
+        for f in $RESULT_FILES; do
+            LABEL=$(basename "$f" .json | sed 's/backtest_wf_//')
+            echo -e "${CYAN}  Attribution: $LABEL${NC}"
+            $PYTHON -m statebot.analysis.attribution \
+                --file "$f" \
+                --field state_id \
+                --min-trades 3
+            echo ""
+        done
+
+        # Cross-Coin Scorecard (ab 2 Coins)
+        N_FILES=$(echo "$RESULT_FILES" | wc -w)
+        if [ "$N_FILES" -ge 2 ]; then
+            echo -e "${CYAN}  Cross-Coin State-Scorecard...${NC}"
+            $PYTHON -m statebot.analysis.attribution \
+                --scorecard \
+                --files $RESULT_FILES \
+                --field state_id \
+                --min-trades 3
+            echo ""
+        fi
+    fi
+
+    echo -e "${GREEN}✔ State-Analyse abgeschlossen.${NC}"
+    echo ""
 fi
 
-# ── Schritt 3: Zusammenfassung ────────────────────────────────────────────────
-echo -e "${YELLOW}[Schritt 3/3] Ergebnisse...${NC}"
+# ── Schritt 4: Zusammenfassung ────────────────────────────────────────────────
+echo -e "${YELLOW}[Schritt 4/4] Ergebnisse...${NC}"
 echo ""
 $PYTHON -m statebot.analysis.show_results 2>/dev/null || true
 echo ""
@@ -283,9 +319,8 @@ echo "======================================================="
 echo -e "  ${GREEN}Pipeline abgeschlossen!${NC}"
 echo ""
 echo "  Nächste Schritte:"
-echo "    1. Backtest-Analyse:  python -m statebot.analysis.attribution --file ..."
-echo "    2. State-Scorecard:   python -m statebot.analysis.attribution --scorecard --files ..."
-echo "    3. Live starten:      python master_runner.py"
+echo "    1. CORE-States in settings.json eintragen → entry_states"
+echo "    2. Live starten: python master_runner.py"
 echo "======================================================="
 echo ""
 
