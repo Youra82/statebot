@@ -67,7 +67,8 @@ if [ -f "$DB_PATH" ]; then
     RESET_DB="${RESET_DB//[$'\r\n ']/}"
     if [[ "$RESET_DB" == "j" || "$RESET_DB" == "J" || "$RESET_DB" == "y" || "$RESET_DB" == "Y" ]]; then
         rm -f "$DB_PATH"
-        echo -e "${GREEN}✔ Alte State-DB gelöscht — Neustart.${NC}"
+        rm -f "$SCRIPT_DIR/artifacts/results"/backtest_wf_*.json
+        echo -e "${GREEN}✔ Alte State-DB + Backtest-Ergebnisse gelöscht — Neustart.${NC}"
     else
         echo -e "${GREEN}✔ Bestehende State-DB wird beibehalten.${NC}"
     fi
