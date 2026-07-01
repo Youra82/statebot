@@ -151,22 +151,32 @@ CAPITAL=1000
 SL=1.5
 RR=2.0
 RISK=1.0
+DO_SWEEP=n
 if [[ "$RUN_BT" == "j" || "$RUN_BT" == "J" || "$RUN_BT" == "y" || "$RUN_BT" == "Y" ]]; then
     read -p "Startkapital in USDT [Standard: 1000]: " CAP_INPUT
     CAP_INPUT="${CAP_INPUT//[$'\r\n ']/}"
     if [[ "$CAP_INPUT" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then CAPITAL=$CAP_INPUT; fi
 
-    read -p "Stop-Loss % [Standard: 1.5]: " SL_INPUT
-    SL_INPUT="${SL_INPUT//[$'\r\n ']/}"
-    if [[ "$SL_INPUT" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then SL=$SL_INPUT; fi
-
-    read -p "Risk:Reward-Ratio [Standard: 2.0]: " RR_INPUT
-    RR_INPUT="${RR_INPUT//[$'\r\n ']/}"
-    if [[ "$RR_INPUT" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then RR=$RR_INPUT; fi
-
     read -p "Risiko pro Trade % [Standard: 1.0]: " RISK_INPUT
     RISK_INPUT="${RISK_INPUT//[$'\r\n ']/}"
     if [[ "$RISK_INPUT" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then RISK=$RISK_INPUT; fi
+
+    echo ""
+    read -p "SL/RR automatisch optimieren (Sweep)? (j/n) [Standard: n]: " DO_SWEEP
+    DO_SWEEP="${DO_SWEEP//[$'\r\n ']/}"
+    DO_SWEEP="${DO_SWEEP:-n}"
+
+    if [[ "$DO_SWEEP" == "j" || "$DO_SWEEP" == "J" ]]; then
+        echo -e "${CYAN}ℹ  Sweep-Modus: SL 1.0-4.0% × RR 1.5-3.0 → Top-5 je Coin${NC}"
+    else
+        read -p "Stop-Loss % [Standard: 1.5]: " SL_INPUT
+        SL_INPUT="${SL_INPUT//[$'\r\n ']/}"
+        if [[ "$SL_INPUT" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then SL=$SL_INPUT; fi
+
+        read -p "Risk:Reward-Ratio [Standard: 2.0]: " RR_INPUT
+        RR_INPUT="${RR_INPUT//[$'\r\n ']/}"
+        if [[ "$RR_INPUT" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then RR=$RR_INPUT; fi
+    fi
 fi
 
 # ── Pairs zusammenbauen ──────────────────────────────────────────────────────
@@ -244,14 +254,19 @@ echo ""
 if [[ "$RUN_BT" == "j" || "$RUN_BT" == "J" || "$RUN_BT" == "y" || "$RUN_BT" == "Y" ]]; then
     echo -e "${YELLOW}[Schritt 2/3] Backtest läuft...${NC}"
     echo ""
+    if [[ "$DO_SWEEP" == "j" || "$DO_SWEEP" == "J" ]]; then
+        BT_ARGS="--sweep --min-trades 10 --top-n 5"
+    else
+        BT_ARGS="--sl-pct $SL --rr $RR"
+    fi
+
     echo "$PAIRS" | while IFS=' ' read -r sym tf; do
         echo -e "${CYAN}  Backtest: $sym ($tf)${NC}"
         $PYTHON run_backtest.py \
             --symbol "$sym" --timeframe "$tf" \
             --capital "$CAPITAL" \
-            --sl-pct "$SL" \
-            --rr "$RR" \
-            --risk "$RISK"
+            --risk "$RISK" \
+            $BT_ARGS
         echo ""
     done
     echo -e "${GREEN}✔ Backtest abgeschlossen.${NC}"
