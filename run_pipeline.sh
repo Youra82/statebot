@@ -255,7 +255,7 @@ if [[ "$RUN_BT" == "j" || "$RUN_BT" == "J" || "$RUN_BT" == "y" || "$RUN_BT" == "
     echo -e "${YELLOW}[Schritt 2/3] Backtest läuft...${NC}"
     echo ""
     if [[ "$DO_SWEEP" == "j" || "$DO_SWEEP" == "J" ]]; then
-        BT_ARGS="--sweep --min-trades 10 --top-n 5"
+        BT_ARGS="--sweep --min-trades 10 --top-n 1"
     else
         BT_ARGS="--sl-pct $SL --rr $RR"
     fi
