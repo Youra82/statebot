@@ -314,20 +314,23 @@ gespeichert (SQLite).
 
 **Empfohlene Coin-Auswahl** (Diversität über verschiedene Marktmechanismen):
 
+**Hinweis**: Bitget Perpetuals (USDT-Swap) haben erst ab ca. 2021 historische OHLCV-Daten.
+Alle Coins mit `--start_date "2021-01-01"` starten.
+
 ```bash
 # Liquid / Macro-sensitiv (Basisanker)
-python build_states.py --pairs "BTC/USDT:USDT|1d" --start_date "2018-01-01"
-python build_states.py --pairs "ETH/USDT:USDT|1d" --start_date "2018-01-01"
+python build_states.py --pairs "BTC/USDT:USDT|1d" --start_date "2021-01-01"
+python build_states.py --pairs "ETH/USDT:USDT|1d" --start_date "2021-01-01"
 
 # Ecosystem-Coins (korreliert aber andere Mikrostruktur)
-python build_states.py --pairs "SOL/USDT:USDT|1d" --start_date "2020-01-01"
-python build_states.py --pairs "BNB/USDT:USDT|1d" --start_date "2019-01-01"
+python build_states.py --pairs "SOL/USDT:USDT|1d" --start_date "2021-01-01"
+python build_states.py --pairs "BNB/USDT:USDT|1d" --start_date "2021-01-01"
 
 # Sentiment-getrieben / Niedrigere BTC-Korrelation
-python build_states.py --pairs "XRP/USDT:USDT|1d" --start_date "2018-01-01"
-python build_states.py --pairs "DOGE/USDT:USDT|1d" --start_date "2019-01-01"
-python build_states.py --pairs "ADA/USDT:USDT|1d"  --start_date "2018-01-01"
-python build_states.py --pairs "LINK/USDT:USDT|1d" --start_date "2019-01-01"
+python build_states.py --pairs "XRP/USDT:USDT|1d" --start_date "2021-01-01"
+python build_states.py --pairs "DOGE/USDT:USDT|1d" --start_date "2021-01-01"
+python build_states.py --pairs "ADA/USDT:USDT|1d"  --start_date "2021-01-01"
+python build_states.py --pairs "LINK/USDT:USDT|1d" --start_date "2021-01-01"
 ```
 
 Ergebnis prüfen:
@@ -344,11 +347,12 @@ Erwartung: 2000+ Bars pro Coin (je nach Start-Datum).
 
 ---
 
-### Phase 2 — Backtest TRAIN-Periode (2018–2022)
+### Phase 2 — Backtest TRAIN-Periode (2021–2023)
 
 Die Train-Periode dient zur **Pareto-Ableitung**: welche States sind in historischen Daten
-profitabel? Sie enthält bewusst verschiedene Regimes: Bear 2018-2019, Recovery 2020,
-Bull-Run 2021.
+profitabel? Sie enthält Bull-Run 2021, Bear-Crash 2022 (Luna, FTX) und Recovery 2023.
+
+**Hinweis**: Bitget Perpetuals haben erst ab ~2021 Daten. Frühere Daten liefern 0 Kerzen.
 
 ```bash
 for COIN in "BTC/USDT:USDT" "ETH/USDT:USDT" "SOL/USDT:USDT" "BNB/USDT:USDT" \
@@ -358,8 +362,8 @@ for COIN in "BTC/USDT:USDT" "ETH/USDT:USDT" "SOL/USDT:USDT" "BNB/USDT:USDT" \
         --mode pnl \
         --symbol "$COIN" \
         --timeframe 1d \
-        --start-date 2018-01-01 \
-        --end-date   2022-01-01 \
+        --start-date 2021-01-01 \
+        --end-date   2023-06-01 \
         --capital 1000 \
         --risk 1.0 \
         --sl-pct 1.5 \
@@ -376,10 +380,10 @@ Outputs: `artifacts/results/train_backtest_pnl_BTCUSDTUSDT_1d.json` etc.
 
 ---
 
-### Phase 3 — Backtest TEST-Periode (2022–2024, Out-of-Sample)
+### Phase 3 — Backtest TEST-Periode (2023–2025, Out-of-Sample)
 
-Die Test-Periode ist das härteste OOS-Regime: Bear-Crash 2022 (Luna-Crash, FTX-Kollaps),
-Recovery 2023, neuer Bull 2024. Signale aus dieser Periode wurden **nie für Training verwendet**.
+Die Test-Periode enthält: Recovery 2023, neuer Bull-Run 2024, Korrekturen 2025.
+Signale aus dieser Periode wurden **nie für Training verwendet**.
 
 ```bash
 for COIN in "BTC/USDT:USDT" "ETH/USDT:USDT" "SOL/USDT:USDT" "BNB/USDT:USDT" \
@@ -389,8 +393,8 @@ for COIN in "BTC/USDT:USDT" "ETH/USDT:USDT" "SOL/USDT:USDT" "BNB/USDT:USDT" \
         --mode pnl \
         --symbol "$COIN" \
         --timeframe 1d \
-        --start-date 2022-01-01 \
-        --end-date   2024-06-01 \
+        --start-date 2023-06-01 \
+        --end-date   2025-06-01 \
         --capital 1000 \
         --risk 1.0 \
         --sl-pct 1.5 \
