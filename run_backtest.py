@@ -32,7 +32,7 @@ def _run_sweep(store, market, tf, args):
             'sl':   sl,
             'rr':   rr,
             'n':    n,
-            'wr':   round(stats.get('win_rate', 0), 1),
+            'wr':   round(stats.get('win_rate', 0) * 100, 1),
             'pf':   round(stats.get('profit_factor', 0), 2),
             'pnl':  round(stats.get('total_pnl_pct', 0), 1),
             'dd':   round(stats.get('max_drawdown_pct', 0), 1),
