@@ -200,13 +200,17 @@ def run_walkforward_backtest(store: StateStore, market: str, tf: str,
         f"PnL: {stats.get('total_pnl_usdt',0):+.2f} USDT | "
         f"DD: {stats.get('max_drawdown_pct',0):.1f}%"
     )
-    if any(v > 0 for v in (_rej['disagreement'], _rej['membership'],
-                            _rej['state_quality'], _rej['composite'])):
+    precision_active = (min_composite > 0 or min_membership > 0 or
+                        max_disagreement < 1.0 or min_state_quality > 0 or
+                        min_stars > 2 or threshold_long > 0.62)
+    total_candidates = sum(_rej.values()) + len(trades)
+    if precision_active and total_candidates > 0:
         logger.info(
-            f"  Filter-Statistik: conf/stars={_rej['conf_stars']} "
-            f"threshold={_rej['threshold']} disagree={_rej['disagreement']} "
-            f"membership={_rej['membership']} quality={_rej['state_quality']} "
-            f"composite={_rej['composite']}"
+            f"  Filter-Trichter ({total_candidates} Kandidaten → {len(trades)} Trades): "
+            f"no_data={_rej['no_data']} few_rows={_rej['few_rows']} "
+            f"conf/stars={_rej['conf_stars']} threshold={_rej['threshold']} "
+            f"disagree={_rej['disagreement']} membership={_rej['membership']} "
+            f"quality={_rej['state_quality']} composite={_rej['composite']}"
         )
     return {"trades": trades, "stats": stats, "equity_curve": eq_curve, "_rejected": _rej}
 
