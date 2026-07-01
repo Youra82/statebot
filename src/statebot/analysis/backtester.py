@@ -74,6 +74,9 @@ def run_walkforward_backtest(store: StateStore, market: str, tf: str,
     trades   = []
     equity   = start_capital
     eq_curve = [equity]
+    _rej = {'no_data': 0, 'state_filter': 0, 'few_rows': 0, 'knn': 0,
+            'conf_stars': 0, 'threshold': 0, 'disagreement': 0,
+            'membership': 0, 'state_quality': 0, 'composite': 0}
 
     for test_idx in range(n - split, n - 1):
         train_rows = rows[:test_idx]
@@ -81,45 +84,38 @@ def run_walkforward_backtest(store: StateStore, market: str, tf: str,
 
         curr_feat = np.array([curr_row.get(c, np.nan) for c in FEATURE_COLS], dtype=np.float64)
         if np.any(np.isnan(curr_feat)):
-            eq_curve.append(equity)
-            continue
+            _rej['no_data'] += 1; eq_curve.append(equity); continue
 
         train_centroids = _recompute_centroids_from_rows(train_rows, centroids, len(state_defs))
         state_id = assign_state_to_vector(curr_feat, train_centroids)
 
         if allowed_states is not None and state_id not in allowed_states:
-            eq_curve.append(equity)
-            continue
+            _rej['state_filter'] += 1; eq_curve.append(equity); continue
 
         state_rows_train = [r for r in train_rows if r.get('state_id') == state_id]
         if len(state_rows_train) < 5:
-            eq_curve.append(equity)
-            continue
+            _rej['few_rows'] += 1; eq_curve.append(equity); continue
 
         knn_result = knn_within_state(curr_feat, state_rows_train, k=k)
         if knn_result is None:
-            eq_curve.append(equity)
-            continue
+            _rej['knn'] += 1; eq_curve.append(equity); continue
 
-        # Prior aus Training-Daten berechnen (kein Look-Ahead via state_def['up_prob'])
         labeled_in_state = [r for r in state_rows_train if r.get('next_close_pct') is not None]
         p_prior = float(np.mean([1.0 if r['next_close_pct'] > 0 else 0.0
                                   for r in labeled_in_state])) if labeled_in_state else 0.5
-        p_bayes   = fuse_prior_likelihood(p_prior, knn_result['p_up'])
+        p_bayes    = fuse_prior_likelihood(p_prior, knn_result['p_up'])
         confidence = knn_result['confidence']
         stars      = quality_stars(p_bayes, confidence, knn_result['k_used'], len(state_rows_train))
 
         if confidence < min_confidence or stars < min_stars:
-            eq_curve.append(equity)
-            continue
+            _rej['conf_stars'] += 1; eq_curve.append(equity); continue
 
         if p_bayes >= threshold_long:
             side = 'long'
         elif p_bayes <= threshold_short:
             side = 'short'
         else:
-            eq_curve.append(equity)
-            continue
+            _rej['threshold'] += 1; eq_curve.append(equity); continue
 
         # Präzisions-Filter (alle optional, 0.0/1.0 = deaktiviert)
         membership = None
@@ -127,22 +123,19 @@ def run_walkforward_backtest(store: StateStore, market: str, tf: str,
         # 1. Markov vs KNN Übereinstimmung
         if max_disagreement < 1.0:
             if abs(p_prior - knn_result['p_up']) > max_disagreement:
-                eq_curve.append(equity)
-                continue
+                _rej['disagreement'] += 1; eq_curve.append(equity); continue
 
         # 2. Membership (Kerndichte im Cluster)
         if min_membership > 0.0 or min_composite > 0.0:
             membership = compute_membership_score(curr_feat, state_id, train_centroids, state_rows_train)
             if min_membership > 0.0 and membership < min_membership:
-                eq_curve.append(equity)
-                continue
+                _rej['membership'] += 1; eq_curve.append(equity); continue
 
         # 3. State-Qualität (Cluster-Güte)
         if min_state_quality > 0.0:
-            state_quality = state_defs[state_id].get('quality_score', 1.0) if state_id < len(state_defs) else 1.0
-            if state_quality < min_state_quality:
-                eq_curve.append(equity)
-                continue
+            sq = state_defs[state_id].get('quality_score', 1.0) if state_id < len(state_defs) else 1.0
+            if sq < min_state_quality:
+                _rej['state_quality'] += 1; eq_curve.append(equity); continue
 
         # 4. Composite Confidence Gate
         if min_composite > 0.0:
@@ -159,8 +152,7 @@ def run_walkforward_backtest(store: StateStore, market: str, tf: str,
                 0.10 * (min(stars, 3) / 3.0)
             )
             if composite < min_composite:
-                eq_curve.append(equity)
-                continue
+                _rej['composite'] += 1; eq_curve.append(equity); continue
 
         actual_ret_pct = curr_row.get('next_close_pct', 0) or 0
         sl_dist = sl_pct / 100.0
@@ -200,13 +192,23 @@ def run_walkforward_backtest(store: StateStore, market: str, tf: str,
         eq_curve.append(equity)
 
     stats = _compute_stats(trades, eq_curve, start_capital)
+    candidates = sum(_rej[k] for k in ('conf_stars', 'threshold', 'disagreement',
+                                        'membership', 'state_quality', 'composite'))
     logger.info(
         f"[Backtest WF] {stats.get('total_trades',0)} Trades | "
         f"WR: {stats.get('win_rate',0):.1%} | "
         f"PnL: {stats.get('total_pnl_usdt',0):+.2f} USDT | "
         f"DD: {stats.get('max_drawdown_pct',0):.1f}%"
     )
-    return {"trades": trades, "stats": stats, "equity_curve": eq_curve}
+    if any(v > 0 for v in (_rej['disagreement'], _rej['membership'],
+                            _rej['state_quality'], _rej['composite'])):
+        logger.info(
+            f"  Filter-Statistik: conf/stars={_rej['conf_stars']} "
+            f"threshold={_rej['threshold']} disagree={_rej['disagreement']} "
+            f"membership={_rej['membership']} quality={_rej['state_quality']} "
+            f"composite={_rej['composite']}"
+        )
+    return {"trades": trades, "stats": stats, "equity_curve": eq_curve, "_rejected": _rej}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
