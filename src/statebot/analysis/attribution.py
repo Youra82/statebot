@@ -88,10 +88,9 @@ def _trade_metrics(group: list[dict]) -> dict:
         dd    = (peak - eq) / abs(peak) * 100 if peak != 0 else 0.0
         max_dd = max(max_dd, dd)
 
-    # Erwartungswert pro Trade
-    avg_win  = float(np.mean([t['pnl_usdt'] for t in wins]))  if wins  else 0.0
-    avg_loss = float(np.mean([t['pnl_usdt'] for t in losses])) if losses else 0.0
-    expectancy = wr * avg_win + (1 - wr) * avg_loss
+    # Erwartungswert pro Trade = avg über ALLE Trades (inkl. Timeouts)
+    # wr * avg_win + (1-wr) * avg_loss wäre falsch wenn Timeouts existieren
+    expectancy = avg_pnl
 
     return {
         'n_trades':       n,
@@ -192,15 +191,15 @@ def print_attribution_table(field: str, rows: list[dict], min_trades: int = 3):
         return
 
     print(f"\n  ── {field} ──")
-    print(f"  {'Bucket':<22} {'N':>5} {'WR':>7} {'AvgPnL':>9} {'PF':>6} {'E[V]':>9} {'Total':>9}")
-    print("  " + "─" * 72)
+    print(f"  {'Bucket':<22} {'N':>5} {'WR':>7} {'E[V]':>9} {'PF':>6} {'Total':>9}")
+    print("  " + "─" * 62)
     for r in rows:
         wr_s = f"{r['win_rate']:.0%}"
-        ev_s = f"{r['expectancy']:+.3f}"
+        ev_s = f"{r['expectancy']:+.4f}"
         tot  = f"{r['total_pnl']:+.2f}"
-        avg  = f"{r['avg_pnl']:+.4f}"
-        print(f"  {str(r['bucket']):<22} {r['n_trades']:>5} {wr_s:>7} {avg:>9} "
-              f"{_pf_str(r['profit_factor']):>6} {ev_s:>9} {tot:>9}")
+        flag = '  ✔' if r['expectancy'] > 0 else '  ✖'
+        print(f"  {str(r['bucket']):<22} {r['n_trades']:>5} {wr_s:>7} {ev_s:>9} "
+              f"{_pf_str(r['profit_factor']):>6} {tot:>9}{flag}")
 
 
 def print_report(results: dict[str, list[dict]], title: str = ""):
