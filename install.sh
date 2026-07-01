@@ -6,6 +6,7 @@ echo "statebot Install"
 if [ ! -d ".venv" ]; then python3 -m venv .venv; fi
 .venv/bin/pip install --upgrade pip
 .venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -e . --quiet
 mkdir -p artifacts/db artifacts/results artifacts/tracker artifacts/tmp logs
 chmod +x *.sh master_runner.py build_states.py run_backtest.py 2>/dev/null || true
 if [ ! -f "secret.json" ]; then
