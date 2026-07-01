@@ -28,6 +28,9 @@ def _run_sweep(store, market, tf, args, allowed_states=None, save_mode='wf'):
             start_capital=args.capital, risk_per_trade_pct=args.risk,
             allowed_states=allowed_states,
             min_composite=args.composite,
+            min_membership=args.min_membership,
+            max_disagreement=args.max_disagreement,
+            min_state_quality=args.min_state_quality,
         )
         stats = r.get('stats', {})
         n = stats.get('total_trades', 0)
@@ -89,11 +92,30 @@ def main():
                         help='Mindest-Trades im Sweep (default: 10)')
     parser.add_argument('--top-n',      type=int,   default=5,    dest='top_n',
                         help='Anzahl beste Kombinationen im Sweep (default: 5)')
-    parser.add_argument('--states',     type=str,   default=None,
+    parser.add_argument('--states',          type=str,   default=None,
                         help='Nur diese State-IDs handeln, kommasepariert (z.B. 8,15)')
-    parser.add_argument('--composite',  type=float, default=0.0,
-                        help='Composite-Konfidenz-Gate (0=aus, z.B. 0.65 für Hochselektion)')
+    parser.add_argument('--composite',       type=float, default=0.0,
+                        help='Composite-Gate (0=aus, z.B. 0.65)')
+    parser.add_argument('--min-membership',  type=float, default=0.0,  dest='min_membership',
+                        help='Mindest-Membership im Cluster (0=aus, z.B. 0.75)')
+    parser.add_argument('--max-disagreement',type=float, default=1.0,  dest='max_disagreement',
+                        help='Max Abstand Markov vs KNN (1=aus, z.B. 0.15)')
+    parser.add_argument('--min-state-quality',type=float,default=0.0,  dest='min_state_quality',
+                        help='Mindest Cluster-Güte (0=aus, z.B. 0.75)')
+    parser.add_argument('--precision',       action='store_true', default=False,
+                        help='Precision-Modus: alle Filter auf 70%-WR-Preset setzen')
     args = parser.parse_args()
+
+    # Precision-Preset überschreibt einzelne Werte
+    if args.precision:
+        args.threshold       = max(args.threshold, 0.72)
+        args.min_stars       = max(args.min_stars, 3)
+        args.composite       = max(args.composite, 0.65)
+        args.min_membership  = max(args.min_membership, 0.75)
+        args.max_disagreement= min(args.max_disagreement, 0.15)
+        print(f"  Precision-Modus: threshold={args.threshold} stars={args.min_stars} "
+              f"composite={args.composite} membership={args.min_membership} "
+              f"disagree<={args.max_disagreement}")
 
     allowed_states = None
     if args.states:
@@ -130,6 +152,9 @@ def main():
                 start_capital=args.capital, risk_per_trade_pct=args.risk,
                 allowed_states=allowed_states,
                 min_composite=args.composite,
+                min_membership=args.min_membership,
+                max_disagreement=args.max_disagreement,
+                min_state_quality=args.min_state_quality,
             )
             print_summary(results, market, tf)
             if results.get('stats', {}).get('total_trades', 0) > 0:

@@ -171,21 +171,37 @@ if [[ "$RUN_BT" == "j" || "$RUN_BT" == "J" || "$RUN_BT" == "y" || "$RUN_BT" == "
     if [[ "$RISK_INPUT" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then RISK=$RISK_INPUT; fi
 
     echo ""
-    read -p "Konfidenz-Schwelle Long/Short [Standard: 0.62 | z.B. 0.75 für hohe Selektion]: " THRESH_INPUT
-    THRESH_INPUT="${THRESH_INPUT//[$'\r\n ']/}"
-    THRESHOLD="0.62"
-    if [[ "$THRESH_INPUT" =~ ^0\.[0-9]+$ ]]; then THRESHOLD=$THRESH_INPUT; fi
+    echo ""
+    echo -e "${YELLOW}  Signal-Selektion:${NC}"
+    echo "    (1) Standard   — Threshold 0.62 | Stars 2 | alle Filter aus"
+    echo "    (2) Precision  — Threshold 0.72 | Stars 3 | Composite 0.65 | Membership 0.75 | Disagree ≤0.15"
+    echo "    (3) Manuell    — eigene Werte eingeben"
+    echo ""
+    read -p "  Modus wählen [Standard: 1]: " SEL_MODE
+    SEL_MODE="${SEL_MODE//[$'\r\n ']/}"
+    SEL_MODE="${SEL_MODE:-1}"
 
-    read -p "Mindest-Qualitätssterne 1-3 [Standard: 2]: " STARS_INPUT
-    STARS_INPUT="${STARS_INPUT//[$'\r\n ']/}"
-    MIN_STARS="2"
-    if [[ "$STARS_INPUT" =~ ^[123]$ ]]; then MIN_STARS=$STARS_INPUT; fi
+    THRESHOLD="0.62"; MIN_STARS="2"; COMPOSITE="0"; PRECISION_FLAG=""
 
-    read -p "Composite-Gate (0=aus | z.B. 0.65 für Hochselektion) [Standard: 0]: " COMP_INPUT
-    COMP_INPUT="${COMP_INPUT//[$'\r\n ']/}"
-    COMPOSITE="0"
-    if [[ "$COMP_INPUT" =~ ^0\.[0-9]+$ ]]; then COMPOSITE=$COMP_INPUT; fi
-    echo -e "${CYAN}ℹ  Threshold=$THRESHOLD | Min-Stars=$MIN_STARS | Composite=$COMPOSITE${NC}"
+    if [[ "$SEL_MODE" == "2" ]]; then
+        PRECISION_FLAG="--precision"
+        echo -e "${CYAN}ℹ  Precision-Modus: Threshold=0.72 | Stars=3 | Composite=0.65 | Membership=0.75 | Disagree≤0.15${NC}"
+    elif [[ "$SEL_MODE" == "3" ]]; then
+        read -p "  Konfidenz-Schwelle [Standard: 0.62]: " THRESH_INPUT
+        THRESH_INPUT="${THRESH_INPUT//[$'\r\n ']/}"
+        if [[ "$THRESH_INPUT" =~ ^0\.[0-9]+$ ]]; then THRESHOLD=$THRESH_INPUT; fi
+
+        read -p "  Min-Stars 1-3 [Standard: 2]: " STARS_INPUT
+        STARS_INPUT="${STARS_INPUT//[$'\r\n ']/}"
+        if [[ "$STARS_INPUT" =~ ^[123]$ ]]; then MIN_STARS=$STARS_INPUT; fi
+
+        read -p "  Composite-Gate (0=aus, z.B. 0.65) [Standard: 0]: " COMP_INPUT
+        COMP_INPUT="${COMP_INPUT//[$'\r\n ']/}"
+        if [[ "$COMP_INPUT" =~ ^0\.[0-9]+$ ]]; then COMPOSITE=$COMP_INPUT; fi
+        echo -e "${CYAN}ℹ  Threshold=$THRESHOLD | Min-Stars=$MIN_STARS | Composite=$COMPOSITE${NC}"
+    else
+        echo -e "${CYAN}ℹ  Standard-Modus.${NC}"
+    fi
 
     echo ""
     read -p "SL/RR automatisch optimieren (Sweep)? (j/n) [Standard: n]: " DO_SWEEP
@@ -286,9 +302,9 @@ if [[ "$RUN_BT" == "j" || "$RUN_BT" == "J" || "$RUN_BT" == "y" || "$RUN_BT" == "
     echo -e "${YELLOW}[Schritt 2/4] Backtest läuft...${NC}"
     echo ""
     if [[ "$DO_SWEEP" == "j" || "$DO_SWEEP" == "J" ]]; then
-        BT_ARGS="--sweep --min-trades 10 --top-n 1 --threshold $THRESHOLD --min-stars $MIN_STARS --composite $COMPOSITE"
+        BT_ARGS="--sweep --min-trades 3 --top-n 1 --threshold $THRESHOLD --min-stars $MIN_STARS --composite $COMPOSITE $PRECISION_FLAG"
     else
-        BT_ARGS="--sl-pct $SL --rr $RR --threshold $THRESHOLD --min-stars $MIN_STARS --composite $COMPOSITE"
+        BT_ARGS="--sl-pct $SL --rr $RR --threshold $THRESHOLD --min-stars $MIN_STARS --composite $COMPOSITE $PRECISION_FLAG"
     fi
 
     echo "$PAIRS" | while IFS=' ' read -r sym tf; do

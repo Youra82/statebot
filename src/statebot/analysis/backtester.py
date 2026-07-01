@@ -52,7 +52,10 @@ def run_walkforward_backtest(store: StateStore, market: str, tf: str,
                               risk_per_trade_pct: float = 1.0,
                               leverage: int = 5,
                               allowed_states: list[int] | None = None,
-                              min_composite: float = 0.0) -> dict:
+                              min_composite: float = 0.0,
+                              min_membership: float = 0.0,
+                              max_disagreement: float = 1.0,
+                              min_state_quality: float = 0.0) -> dict:
     rows = store.get_labeled_vectors(market, tf)
     n    = len(rows)
     if n < 60:
@@ -118,9 +121,33 @@ def run_walkforward_backtest(store: StateStore, market: str, tf: str,
             eq_curve.append(equity)
             continue
 
-        # Composite Confidence Gate (0.0 = deaktiviert)
-        if min_composite > 0.0:
+        # Präzisions-Filter (alle optional, 0.0/1.0 = deaktiviert)
+        membership = None
+
+        # 1. Markov vs KNN Übereinstimmung
+        if max_disagreement < 1.0:
+            if abs(p_prior - knn_result['p_up']) > max_disagreement:
+                eq_curve.append(equity)
+                continue
+
+        # 2. Membership (Kerndichte im Cluster)
+        if min_membership > 0.0 or min_composite > 0.0:
             membership = compute_membership_score(curr_feat, state_id, train_centroids, state_rows_train)
+            if min_membership > 0.0 and membership < min_membership:
+                eq_curve.append(equity)
+                continue
+
+        # 3. State-Qualität (Cluster-Güte)
+        if min_state_quality > 0.0:
+            state_quality = state_defs[state_id].get('quality_score', 1.0) if state_id < len(state_defs) else 1.0
+            if state_quality < min_state_quality:
+                eq_curve.append(equity)
+                continue
+
+        # 4. Composite Confidence Gate
+        if min_composite > 0.0:
+            if membership is None:
+                membership = compute_membership_score(curr_feat, state_id, train_centroids, state_rows_train)
             dir_p     = p_bayes            if side == 'long' else (1.0 - p_bayes)
             dir_prior = p_prior            if side == 'long' else (1.0 - p_prior)
             dir_knn   = knn_result['p_up'] if side == 'long' else (1.0 - knn_result['p_up'])
