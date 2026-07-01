@@ -51,7 +51,8 @@ def run_walkforward_backtest(store: StateStore, market: str, tf: str,
                               start_capital: float = 1000.0,
                               risk_per_trade_pct: float = 1.0,
                               leverage: int = 5,
-                              allowed_states: list[int] | None = None) -> dict:
+                              allowed_states: list[int] | None = None,
+                              min_composite: float = 0.0) -> dict:
     rows = store.get_labeled_vectors(market, tf)
     n    = len(rows)
     if n < 60:
@@ -116,6 +117,23 @@ def run_walkforward_backtest(store: StateStore, market: str, tf: str,
         else:
             eq_curve.append(equity)
             continue
+
+        # Composite Confidence Gate (0.0 = deaktiviert)
+        if min_composite > 0.0:
+            membership = compute_membership_score(curr_feat, state_id, train_centroids, state_rows_train)
+            dir_p     = p_bayes            if side == 'long' else (1.0 - p_bayes)
+            dir_prior = p_prior            if side == 'long' else (1.0 - p_prior)
+            dir_knn   = knn_result['p_up'] if side == 'long' else (1.0 - knn_result['p_up'])
+            composite = (
+                0.35 * dir_p +
+                0.20 * dir_prior +
+                0.20 * dir_knn +
+                0.15 * membership +
+                0.10 * (min(stars, 3) / 3.0)
+            )
+            if composite < min_composite:
+                eq_curve.append(equity)
+                continue
 
         actual_ret_pct = curr_row.get('next_close_pct', 0) or 0
         sl_dist = sl_pct / 100.0

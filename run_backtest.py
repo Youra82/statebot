@@ -27,6 +27,7 @@ def _run_sweep(store, market, tf, args, allowed_states=None, save_mode='wf'):
             min_stars=args.min_stars,
             start_capital=args.capital, risk_per_trade_pct=args.risk,
             allowed_states=allowed_states,
+            min_composite=args.composite,
         )
         stats = r.get('stats', {})
         n = stats.get('total_trades', 0)
@@ -90,6 +91,8 @@ def main():
                         help='Anzahl beste Kombinationen im Sweep (default: 5)')
     parser.add_argument('--states',     type=str,   default=None,
                         help='Nur diese State-IDs handeln, kommasepariert (z.B. 8,15)')
+    parser.add_argument('--composite',  type=float, default=0.0,
+                        help='Composite-Konfidenz-Gate (0=aus, z.B. 0.65 für Hochselektion)')
     args = parser.parse_args()
 
     allowed_states = None
@@ -126,6 +129,7 @@ def main():
                 min_stars=args.min_stars,
                 start_capital=args.capital, risk_per_trade_pct=args.risk,
                 allowed_states=allowed_states,
+                min_composite=args.composite,
             )
             print_summary(results, market, tf)
             if results.get('stats', {}).get('total_trades', 0) > 0:
