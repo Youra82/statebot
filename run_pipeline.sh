@@ -307,6 +307,29 @@ if [[ "$RUN_BT" == "j" || "$RUN_BT" == "J" || "$RUN_BT" == "y" || "$RUN_BT" == "
 
     echo -e "${GREEN}✔ State-Analyse abgeschlossen.${NC}"
     echo ""
+
+    # ── Schritt 3b: Gefilterter Backtest (CORE-States) ───────────────────────
+    echo ""
+    read -p "Gefilterten Backtest mit CORE-States durchführen? State-IDs eingeben (z.B. 8,15) oder Enter überspringen: " CORE_STATES
+    CORE_STATES="${CORE_STATES//[$'\r\n ']/}"
+
+    if [ -n "$CORE_STATES" ]; then
+        echo ""
+        echo -e "${YELLOW}[Schritt 3b] Gefilterter Backtest (States: $CORE_STATES)...${NC}"
+        echo ""
+        echo "$PAIRS" | while IFS=' ' read -r sym tf; do
+            echo -e "${CYAN}  Filtered Backtest: $sym ($tf) | States: $CORE_STATES${NC}"
+            $PYTHON run_backtest.py \
+                --symbol "$sym" --timeframe "$tf" \
+                --capital "$CAPITAL" \
+                --risk "$RISK" \
+                --states "$CORE_STATES" \
+                $BT_ARGS
+            echo ""
+        done
+        echo -e "${GREEN}✔ Gefilterter Backtest abgeschlossen.${NC}"
+        echo ""
+    fi
 fi
 
 # ── Schritt 4: Zusammenfassung ────────────────────────────────────────────────

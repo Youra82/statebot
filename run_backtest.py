@@ -13,7 +13,7 @@ SL_SWEEP = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0]
 RR_SWEEP = [1.5, 2.0, 2.5, 3.0]
 
 
-def _run_sweep(store, market, tf, args):
+def _run_sweep(store, market, tf, args, allowed_states=None, save_mode='wf'):
     combos = [(sl, rr) for sl in SL_SWEEP for rr in RR_SWEEP]
     print(f"\n  Sweep: {len(combos)} Kombinationen für {market} ({tf}) ...")
 
@@ -23,6 +23,7 @@ def _run_sweep(store, market, tf, args):
             store, market, tf,
             k=args.k, sl_pct=sl, rr_ratio=rr,
             start_capital=args.capital, risk_per_trade_pct=args.risk,
+            allowed_states=allowed_states,
         )
         stats = r.get('stats', {})
         n = stats.get('total_trades', 0)
@@ -62,7 +63,7 @@ def _run_sweep(store, market, tf, args):
           f"(PF={best['pf']}, WR={best['wr']}%, PnL={best['pnl']:+.1f}%)")
 
     if best['_r'].get('stats', {}).get('total_trades', 0) > 0:
-        save_results(best['_r'], market, tf)
+        save_results(best['_r'], market, tf, mode=save_mode)
 
 
 def main():
@@ -80,7 +81,17 @@ def main():
                         help='Mindest-Trades im Sweep (default: 10)')
     parser.add_argument('--top-n',      type=int,   default=5,    dest='top_n',
                         help='Anzahl beste Kombinationen im Sweep (default: 5)')
+    parser.add_argument('--states',     type=str,   default=None,
+                        help='Nur diese State-IDs handeln, kommasepariert (z.B. 8,15)')
     args = parser.parse_args()
+
+    allowed_states = None
+    if args.states:
+        try:
+            allowed_states = [int(x.strip()) for x in args.states.split(',') if x.strip()]
+            print(f"  Filter: nur States {allowed_states}")
+        except ValueError:
+            print(f"  WARNUNG: --states '{args.states}' konnte nicht geparst werden — ignoriert")
 
     store = StateStore(DB_PATH)
     pairs = store.get_all_market_pairs()
@@ -94,18 +105,21 @@ def main():
     elif args.symbol:
         pairs = [(m, tf) for m, tf in pairs if m == args.symbol]
 
+    save_mode = 'wf_filtered' if allowed_states else 'wf'
+
     for market, tf in pairs:
         if args.sweep:
-            _run_sweep(store, market, tf, args)
+            _run_sweep(store, market, tf, args, allowed_states=allowed_states, save_mode=save_mode)
         else:
             results = run_walkforward_backtest(
                 store, market, tf,
                 k=args.k, sl_pct=args.sl_pct, rr_ratio=args.rr,
                 start_capital=args.capital, risk_per_trade_pct=args.risk,
+                allowed_states=allowed_states,
             )
             print_summary(results, market, tf)
             if results.get('stats', {}).get('total_trades', 0) > 0:
-                save_results(results, market, tf)
+                save_results(results, market, tf, mode=save_mode)
 
     store.close()
 

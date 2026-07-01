@@ -50,7 +50,8 @@ def run_walkforward_backtest(store: StateStore, market: str, tf: str,
                               sl_pct:   float = 1.5,
                               start_capital: float = 1000.0,
                               risk_per_trade_pct: float = 1.0,
-                              leverage: int = 5) -> dict:
+                              leverage: int = 5,
+                              allowed_states: list[int] | None = None) -> dict:
     rows = store.get_labeled_vectors(market, tf)
     n    = len(rows)
     if n < 60:
@@ -81,6 +82,10 @@ def run_walkforward_backtest(store: StateStore, market: str, tf: str,
 
         train_centroids = _recompute_centroids_from_rows(train_rows, centroids, len(state_defs))
         state_id = assign_state_to_vector(curr_feat, train_centroids)
+
+        if allowed_states is not None and state_id not in allowed_states:
+            eq_curve.append(equity)
+            continue
 
         state_rows_train = [r for r in train_rows if r.get('state_id') == state_id]
         if len(state_rows_train) < 5:
