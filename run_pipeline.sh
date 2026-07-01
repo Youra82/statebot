@@ -129,15 +129,24 @@ N_CLUSTERS="${N_CLUSTERS:-20}"
 if [[ ! "$N_CLUSTERS" =~ ^[0-9]+$ ]]; then N_CLUSTERS=20; fi
 echo -e "${CYAN}ℹ  n_clusters = $N_CLUSTERS${NC}"
 
-# ── 5. Inkrementell? (nur wenn DB existiert) ──────────────────────────────────
+# ── 5. Phase 1 überspringen / Inkrementell? ──────────────────────────────────
 INCR_ARG=""
+SKIP_BUILD=n
 if [ -f "$DB_PATH" ]; then
     echo ""
-    read -p "Inkrementell updaten? (nur neue Kerzen herunterladen) (j/n) [Standard: n]: " DO_INCR
-    DO_INCR="${DO_INCR//[$'\r\n ']/}"
-    if [[ "$DO_INCR" == "j" || "$DO_INCR" == "J" ]]; then
-        INCR_ARG="--incremental"
-        echo -e "${GREEN}✔ Inkrementeller Modus — nur neue Bars werden geladen.${NC}"
+    read -p "State Space bereits vorhanden — Phase 1 überspringen? (j/n) [Standard: j]: " SKIP_INPUT
+    SKIP_INPUT="${SKIP_INPUT//[$'\r\n ']/}"
+    SKIP_INPUT="${SKIP_INPUT:-j}"
+    if [[ "$SKIP_INPUT" == "j" || "$SKIP_INPUT" == "J" ]]; then
+        SKIP_BUILD=j
+        echo -e "${GREEN}✔ Phase 1 übersprungen — bestehender State Space wird verwendet.${NC}"
+    else
+        read -p "Inkrementell updaten? (nur neue Kerzen) (j/n) [Standard: n]: " DO_INCR
+        DO_INCR="${DO_INCR//[$'\r\n ']/}"
+        if [[ "$DO_INCR" == "j" || "$DO_INCR" == "J" ]]; then
+            INCR_ARG="--incremental"
+            echo -e "${GREEN}✔ Inkrementeller Modus — nur neue Bars werden geladen.${NC}"
+        fi
     fi
 fi
 
@@ -171,7 +180,12 @@ if [[ "$RUN_BT" == "j" || "$RUN_BT" == "J" || "$RUN_BT" == "y" || "$RUN_BT" == "
     STARS_INPUT="${STARS_INPUT//[$'\r\n ']/}"
     MIN_STARS="2"
     if [[ "$STARS_INPUT" =~ ^[123]$ ]]; then MIN_STARS=$STARS_INPUT; fi
-    echo -e "${CYAN}ℹ  Threshold=$THRESHOLD | Min-Stars=$MIN_STARS${NC}"
+
+    read -p "Composite-Gate (0=aus | z.B. 0.65 für Hochselektion) [Standard: 0]: " COMP_INPUT
+    COMP_INPUT="${COMP_INPUT//[$'\r\n ']/}"
+    COMPOSITE="0"
+    if [[ "$COMP_INPUT" =~ ^0\.[0-9]+$ ]]; then COMPOSITE=$COMP_INPUT; fi
+    echo -e "${CYAN}ℹ  Threshold=$THRESHOLD | Min-Stars=$MIN_STARS | Composite=$COMPOSITE${NC}"
 
     echo ""
     read -p "SL/RR automatisch optimieren (Sweep)? (j/n) [Standard: n]: " DO_SWEEP
@@ -245,31 +259,36 @@ done
 echo ""
 
 # ── Schritt 1: State Space aufbauen ──────────────────────────────────────────
-echo -e "${YELLOW}[Schritt 1/4] State Space aufbauen (Features → Clustering → Transitions)...${NC}"
-echo ""
-
-export STATEBOT_PIPELINE=1
-echo "$PAIRS" | while IFS=' ' read -r sym tf; do
-    echo -e "${CYAN}  Scanne: $sym ($tf)${NC}"
-    $PYTHON build_states.py \
-        --pairs "${sym}|${tf}" \
-        --n_clusters "$N_CLUSTERS" \
-        $START_ARG $INCR_ARG
+if [[ "$SKIP_BUILD" == "j" ]]; then
+    echo -e "${GREEN}[Schritt 1/4] State Space übersprungen — bestehende DB wird verwendet.${NC}"
     echo ""
-done
-unset STATEBOT_PIPELINE
+else
+    echo -e "${YELLOW}[Schritt 1/4] State Space aufbauen (Features → Clustering → Transitions)...${NC}"
+    echo ""
 
-echo -e "${GREEN}✔ State Space aufgebaut.${NC}"
-echo ""
+    export STATEBOT_PIPELINE=1
+    echo "$PAIRS" | while IFS=' ' read -r sym tf; do
+        echo -e "${CYAN}  Scanne: $sym ($tf)${NC}"
+        $PYTHON build_states.py \
+            --pairs "${sym}|${tf}" \
+            --n_clusters "$N_CLUSTERS" \
+            $START_ARG $INCR_ARG
+        echo ""
+    done
+    unset STATEBOT_PIPELINE
+
+    echo -e "${GREEN}✔ State Space aufgebaut.${NC}"
+    echo ""
+fi
 
 # ── Schritt 2: Backtest ───────────────────────────────────────────────────────
 if [[ "$RUN_BT" == "j" || "$RUN_BT" == "J" || "$RUN_BT" == "y" || "$RUN_BT" == "Y" ]]; then
     echo -e "${YELLOW}[Schritt 2/4] Backtest läuft...${NC}"
     echo ""
     if [[ "$DO_SWEEP" == "j" || "$DO_SWEEP" == "J" ]]; then
-        BT_ARGS="--sweep --min-trades 10 --top-n 1 --threshold $THRESHOLD --min-stars $MIN_STARS"
+        BT_ARGS="--sweep --min-trades 10 --top-n 1 --threshold $THRESHOLD --min-stars $MIN_STARS --composite $COMPOSITE"
     else
-        BT_ARGS="--sl-pct $SL --rr $RR --threshold $THRESHOLD --min-stars $MIN_STARS"
+        BT_ARGS="--sl-pct $SL --rr $RR --threshold $THRESHOLD --min-stars $MIN_STARS --composite $COMPOSITE"
     fi
 
     echo "$PAIRS" | while IFS=' ' read -r sym tf; do
